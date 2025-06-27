@@ -20,54 +20,54 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.llmSettings = llmSettings;
     console.log('LLM Settings:', window.llmSettings)
     
-    let githubToken = null;
-    // Use 'ghtok' from your config to get the token path
-    const githubTokenPath = window.machineConfig.ghtok;
-    
-    if (githubTokenPath) {
-        try {
-            console.log(`Attempting to fetch GitHub token from: ${githubTokenPath}`);
-            const tokenResponse = await fetch('https://localhost/' + githubTokenPath);
-            if (!tokenResponse.ok) {
-                throw new Error(`Failed to fetch GitHub token: ${tokenResponse.status} ${tokenResponse.statusText}`);
-            }
-            githubToken = (await tokenResponse.text()).trim();
-            console.log('GitHub token fetched successfully.');
-        } catch (error) {
-            console.error('Error fetching GitHub token:', error);
-            alert(`Could not load GitHub token from ${githubTokenPath}. GitHub API features may not work.`);
-        }
-    } else {
-        console.warn('window.machineConfig.ghtok is not defined. GitHub API features will not be available.');
-    }
-    
-    const repoOwner = "thingking-machine";
-    const repoName = "thingking_machine";
-    const filePath = "machina.yaml";
-    
-    try {
-        // Initialize Octokit with the access token
-        const octokit = new Octokit({
-            auth: githubToken,
-        });
-        
-        // Fetch the file from the private repository
-        const response = await octokit.repos.getContent({
-            owner: repoOwner,
-            repo: repoName,
-            path: filePath,
-        });
-        
-        // Decode the base64 content
-        const yamlContent = atob(response.data.content);
-        
-        // Parse YAML into a JavaScript object
-        const jsObject = jsyaml.load(yamlContent);
-        console.log("Parsed YAML as JavaScript object:", jsObject)
-    } catch (error) {
-        console.error("Error fetching or parsing YAML file:", error);
-        throw error;
-    }
+    // let githubToken = null;
+    // // Use 'ghtok' from your config to get the token path
+    // const githubTokenPath = window.machineConfig.ghtok;
+    //
+    // if (githubTokenPath) {
+    //     try {
+    //         console.log(`Attempting to fetch GitHub token from: ${githubTokenPath}`);
+    //         const tokenResponse = await fetch('https://localhost/' + githubTokenPath);
+    //         if (!tokenResponse.ok) {
+    //             throw new Error(`Failed to fetch GitHub token: ${tokenResponse.status} ${tokenResponse.statusText}`);
+    //         }
+    //         githubToken = (await tokenResponse.text()).trim();
+    //         console.log('GitHub token fetched successfully.');
+    //     } catch (error) {
+    //         console.error('Error fetching GitHub token:', error);
+    //         alert(`Could not load GitHub token from ${githubTokenPath}. GitHub API features may not work.`);
+    //     }
+    // } else {
+    //     console.warn('window.machineConfig.ghtok is not defined. GitHub API features will not be available.');
+    // }
+    //
+    // const repoOwner = "thingking-machine";
+    // const repoName = "thingking_machine";
+    // const filePath = "machina.yaml";
+    //
+    // try {
+    //     // Initialize Octokit with the access token
+    //     const octokit = new Octokit({
+    //         auth: githubToken,
+    //     });
+    //
+    //     // Fetch the file from the private repository
+    //     const response = await octokit.repos.getContent({
+    //         owner: repoOwner,
+    //         repo: repoName,
+    //         path: filePath,
+    //     });
+    //
+    //     // Decode the base64 content
+    //     const yamlContent = atob(response.data.content);
+    //
+    //     // Parse YAML into a JavaScript object
+    //     const jsObject = jsyaml.load(yamlContent);
+    //     console.log("Parsed YAML as JavaScript object:", jsObject)
+    // } catch (error) {
+    //     console.error("Error fetching or parsing YAML file:", error);
+    //     throw error;
+    // }
     
     // Check whether the page has the container.
     const contentContainer = document.querySelector('.container-md.markdown-body');
