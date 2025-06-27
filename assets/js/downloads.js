@@ -1,3 +1,5 @@
+---
+---
 export async function downloadLocalFile(fileName) {
   try { // --- Fetch the text file ---
     console.log(`Downloader: Fetching the ${fileName} from https://localhost/`);
@@ -17,11 +19,11 @@ export async function downloadLocalFile(fileName) {
 // Function to download GitHub yaml file
 export async function downloadYamlFromGitHub(owner, repo, file, branch, token) {
   try {
-    const owner = owner || 'thingking-machine'; // Your GitHub username or organization
-    const repo = repo || 'thingking_machine'; // The name of your private repository
-    const file = file || 'machina.yaml'; // The path to the YAML file within the repo
+    const owner = owner || '{{ site.github_settings.owner }}'; // Your GitHub username or organization
+    const repo = repo || '{{ site.github_settings.repo }}'; // The name of your private repository
+    const file = file || '{{ site.github_settings.config_path }}'; // The path to the YAML file within the repo
     const branch = 'main'; // The branch where the file is located (e.g., 'main', 'master', 'dev')
-    
+
     // Construct the GitHub API URL for repository contents
     const githubApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${file}?ref=${branch}`;
     
