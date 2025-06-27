@@ -1,11 +1,14 @@
 <title>Thingking</title>
 <script>
-        window.machineConfig = {
-            name: 'Thingking-Machine',
-            instruction: 'thingking.txt',
-            work: "{{ '/assets/js/fireapi.js' | relative_url }}",
-            token: 'fireworks.txt',
-            apiUrl: 'https://api.fireworks.ai/inference/v1/chat/completions',
-            llm: 'accounts/fireworks/models/llama-v3p1-8b-instruct'
-        };
+  window.machineConfig = {
+    name: 'Thingking-Machine',
+    instruction: 'thingking.txt',
+    work: "{{ '/assets/js/fireapi.js' | relative_url }}",
+    token: 'fireworks.txt',
+    ghtok: 'github.txt',
+    apiUrl: 'https://api.fireworks.ai/inference/v1/chat/completions',
+    llm: 'accounts/fireworks/models/llama-v3p1-8b-instruct'
+  };
 </script>
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@octokit/rest@20.1.1/dist-web/octokit-rest.min.js"></script>

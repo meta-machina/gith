@@ -1,25 +1,98 @@
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const llmSettings = {};
     const queryParams = new URLSearchParams(window.location.search);
-
+    
     // Iterate over all query parameters found in the URL
     for (const [key, value] of queryParams.entries()) {
         // Basic type conversion for known numeric fields
         if (key === 'temperature') {
-          const numValue = parseFloat(value);
-          llmSettings[key] = isNaN(numValue) ? value : numValue;
+            const numValue = parseFloat(value);
+            llmSettings[key] = isNaN(numValue) ? value : numValue;
         } else if (key === 'max_tokens') {
-          const numValue = parseInt(value, 10);
-          llmSettings[key] = isNaN(numValue) ? value : numValue;
+            const numValue = parseInt(value, 10);
+            llmSettings[key] = isNaN(numValue) ? value : numValue;
         } else {
-          llmSettings[key] = value;
+            llmSettings[key] = value;
         }
-      }
+    }
     // Make the parameters globally available for other scripts
     window.llmSettings = llmSettings;
     console.log('LLM Settings:', window.llmSettings)
-
+    
+    let githubToken = null;
+    const githubTokenPath = window.machineConfig.ghtok; // Get path from machineConfig
+    
+    if (githubTokenPath) {
+        try {
+            console.log(`Attempting to fetch GitHub token from: ${githubTokenPath}`);
+            const tokenResponse = await fetch('https://localhost/' + githubTokenPath);
+            if (!tokenResponse.ok) {
+                throw new Error(`Failed to fetch GitHub token from ${githubTokenPath}: ${tokenResponse.status} ${tokenResponse.statusText}`);
+            }
+            githubToken = (await tokenResponse.text()).trim(); // Get the token and trim whitespace
+            console.log('GitHub token fetched successfully.');
+        } catch (error) {
+            console.error('Error fetching GitHub token:', error);
+            alert(`Could not load GitHub token from ${githubTokenPath}. GitHub API features may not work. Error: ${error.message}`);
+        }
+    } else {
+        console.warn('window.machineConfig.ghtok is not defined. GitHub API features will not be available.');
+    }
+    
+    // Proceed to fetch YAML only if a GitHub token was successfully obtained
+    if (githubToken) {
+        try {
+            // The Octokit library is available globally as `window.octokitRest`
+            const octokit = new octokitRest.Octokit({
+                auth: githubToken
+            });
+            
+            const owner = 'thingking-machine'; // Your GitHub username or organization
+            const repo = 'thingking-machine'; // The name of your private repository
+            const path = 'src/thingking_machine/machina.yaml'; // The path to the YAML file within the repo
+            const branch = 'main'; // The branch where the file is located (e.g., 'main', 'master', 'dev')
+            
+            console.log('Attempting to fetch machine configuration using Octokit.js...');
+            
+            // Use the Octokit SDK to get the repository content
+            const response = await octokit.rest.repos.getContent({
+                owner,
+                repo,
+                path,
+                ref: branch,
+            });
+            
+            // The file content from the API is in response.data.content and is Base64 encoded
+            if (!response.data || !response.data.content) {
+                throw new Error('File content not found in GitHub API response.');
+            }
+            
+            // Decode the Base64 content to get the raw YAML string
+            const yamlText = atob(response.data.content);
+            
+            // Use js-yaml to parse the text and store it globally
+            // Note: window.machineConfig is already initialized from head-custom.html
+            // We are now merging or overwriting properties from the YAML.
+            const fetchedConfig = jsyaml.load(yamlText);
+            // A common pattern is to merge the fetched config with the existing one,
+            // allowing the YAML to override or add properties.
+            // Object.assign(window.machineInstruction, fetchedConfig);
+            console.log('Machine Config loaded and updated from private GitHub YAML via Octokit:', fetchedConfig);
+            
+        } catch (error) {
+            // Octokit provides detailed error messages
+            console.error('Failed to load machine configuration via Octokit:', error);
+            alert(`Could not load the machine configuration file from GitHub. Status: ${error.status || 'N/A'}. Message: ${error.message}`);
+            // Fallback: window.machineConfig is already initialized from head-custom.html,
+            // so we don't need to re-initialize it to an empty object here,
+            // but we might want to log a warning that the dynamic config failed to load.
+        }
+    } else {
+        console.warn('GitHub token not available. Skipping GitHub YAML fetch.');
+        // window.machineConfig is already initialized from head-custom.html
+    }
+    
     // Check whether the page has the container.
     const contentContainer = document.querySelector('.container-md.markdown-body');
     if (!contentContainer) {
@@ -31,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!h1Element) {
         console.error('H1 element not found. UI elements might be misplaced.');
     }
-
+    
     // Capture HTML from original static <p class="dialogue"> elements and then hide them.
     // These elements are not moved, respecting their original structure for other potential uses,
     // but are hidden to cede display control to the dynamic dialogueWrapper.
@@ -41,13 +114,13 @@ document.addEventListener('DOMContentLoaded', () => {
         initialHtml += p.outerHTML; // Capture their HTML content
         p.style.display = 'none';          // Hide the original static element
     });
-
+    
     // 1. Create a wrapper for the dialogue content (will be populated by updateDisplayState)
     const dialogueWrapper = document.createElement('div');
     dialogueWrapper.id = 'dialogue-wrapper';
     dialogueWrapper.style.paddingBottom = '20px';
-
-
+    
+    
     // 2. Create the textarea for editing
     const textarea = document.createElement('textarea');
     textarea.className = 'form-control';
@@ -56,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
     textarea.style.display = 'none'; // Initially hidden
     textarea.style.setProperty('border', '1px solid lightgrey');
     textarea.style.padding = '10px';
-
+    
     // 3. Create container and button for file picking
     const filePickerContainer = document.createElement('div');
     filePickerContainer.id = 'file-picker-container';
@@ -67,7 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
     filePickerContainer.style.alignItems = 'center';
     filePickerContainer.style.padding = '20px';
     filePickerContainer.style.display = 'none'; // Initially hidden, updateDisplayState will show it
-
+    
     const chooseFileButton = document.createElement('button');
     chooseFileButton.id = 'chooseFileButton';
     chooseFileButton.className = 'btn btn-primary'; // GitHub Primer style
@@ -75,14 +148,14 @@ document.addEventListener('DOMContentLoaded', () => {
     chooseFileButton.style.padding = '10px 20px'; // Make button larger
     chooseFileButton.style.fontSize = '1.0rem';
     filePickerContainer.appendChild(chooseFileButton);
-
+    
     // 4. Insert dynamic elements into the DOM (after H1 or fallback)
     if (h1Element) {
         h1Element.after(dialogueWrapper, textarea, filePickerContainer);
     } else {
         contentContainer.prepend(dialogueWrapper, textarea, filePickerContainer); // Fallback
     }
-
+    
     // 5. Initialize localStorage:
     // If 'multilogue' is null, try to populate from static HTML. Otherwise, use existing.
     let platoTextForInit = localStorage.getItem('multilogue');
@@ -99,6 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         localStorage.setItem('multilogue', platoTextForInit);
     }
+    
     // 6. Function to update display based on localStorage content
     function updateDisplayState() {
         const currentPlatoText = localStorage.getItem('multilogue');
@@ -114,8 +188,8 @@ document.addEventListener('DOMContentLoaded', () => {
             textarea.style.display = 'none';
             filePickerContainer.style.display = 'none';
             // Scroll to the bottom of the dialogue content after it's updated and shown
-            dialogueWrapper.scrollIntoView({ behavior: 'smooth', block: 'end' });
-
+            dialogueWrapper.scrollIntoView({behavior: 'smooth', block: 'end'});
+            
         } else {
             // No valid content, show file picker
             dialogueWrapper.style.display = 'none';
@@ -125,9 +199,10 @@ document.addEventListener('DOMContentLoaded', () => {
             textarea.value = ''; // Clear textarea
         }
     }
+    
     // Initial display update
     updateDisplayState();
-
+    
     // 7. Event listener for "Choose File" button
     chooseFileButton.addEventListener('click', async () => {
         try {
@@ -141,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const file = await fileHandle.getFile();
             const fileContent = await file.text();
-
+            
             localStorage.setItem('multilogue', fileContent);
             // No need to set textarea.value here, updateDisplayState will handle if we switch to editor
             // OR, if we want to go directly to editor:
@@ -159,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-
+    
     // 8. Event listener to switch to edit mode when dialogue content is clicked
     dialogueWrapper.addEventListener('click', () => {
         try {
@@ -190,13 +265,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.ctrlKey && event.shiftKey && event.key === 'Enter') {
             event.preventDefault();
             const textToSave = localStorage.getItem('multilogue') || '';
-
+            
             if (!textToSave.trim()) {
                 console.log('Ctrl+Shift+Enter: Dialogue content is empty. Nothing to save.');
                 alert('Dialogue is empty. Nothing to save.');
                 return; // Prevent saving an empty file
             }
-
+            
             try {
                 // Always prompt "Save As"
                 const fileHandle = await window.showSaveFilePicker({
@@ -208,22 +283,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         },
                     }],
                 });
-
+                
                 // Create a FileSystemWritableFileStream to write to.
                 const writable = await fileHandle.createWritable();
-
+                
                 // Write the contents of the file to the stream.
                 await writable.write(textToSave);
-
+                
                 // Close the file and write the contents to disk.
                 await writable.close();
-
+                
                 // If file save was successful, then update localStorage
                 localStorage.setItem('multilogue', textToSave);
                 updateDisplayState(); // Refresh the view
-
+                
                 // Optional: alert('Dialogue saved to file!');
-
+                
             } catch (err) {
                 // Handle errors, e.g., if the user cancels the save dialog
                 if (err.name !== 'AbortError') {
@@ -234,43 +309,43 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     // 11. Event listener for LLM communications (Alt+Shift)
-    document.addEventListener('keydown', function(event) {
+    document.addEventListener('keydown', function (event) {
         if (event.altKey && event.shiftKey) {
             event.preventDefault();
-
+            
             // const dialogueWrapper = document.getElementById('dialogue-wrapper');
             if (!dialogueWrapper) {
                 console.error('Alt+Shift: dialogue-wrapper not found.');
                 alert('Error: Could not find the dialogue content to send.');
                 return;
             }
-
+            
             const htmlContent = dialogueWrapper.innerHTML;
             if (!htmlContent || htmlContent.trim() === '') {
                 console.log('Alt+Shift: Dialogue content is empty. Nothing to send.');
                 alert('Dialogue is empty. Please add some content first.');
                 return;
             }
-
+            
             console.log('Alt+Shift pressed. Preparing to send dialogue to LLM worker...');
-
+            
             try {
                 const cmjMessages = platoHtmlToCmj(htmlContent); // platoHtmlToCmj is global
-
+                
                 const userQueryParameters = {
                     config: window.machineConfig,
                     settings: window.llmSettings,
                     messages: cmjMessages
                 };
-
+                
                 console.log('Alt+Shift: Launching LLM worker with CMJ messages:', userQueryParameters);
                 const llmWorker = new Worker(machineConfig.work);
-
-                llmWorker.onmessage = function(e) {
+                
+                llmWorker.onmessage = function (e) {
                     console.log('Main thread: Message received from worker:', e.data);
                     if (e.data.type === 'success') {
                         console.log('Worker task successful. LLM Response:', e.data.data);
-
+                        
                         try {
                             const llmResponseData = e.data.data;
                             if (!llmResponseData || !llmResponseData || llmResponseData.content.length === 0) {
@@ -278,18 +353,18 @@ document.addEventListener('DOMContentLoaded', () => {
                                 alert('Received an empty or invalid response from the LLM.');
                                 return;
                             }
-
+                            
                             console.log('Initial llmResponseData:', llmResponseData)
-
+                            
                             const newCmjMessage = {
                                 role: llmResponseData.role,
                                 name: machineConfig.name,
                                 content: llmResponseData.content.trim()
                             };
-
+                            
                             // cmjMessages (from the outer scope of the Alt+Shift listener) is updated
                             cmjMessages.push(newCmjMessage);
-
+                            
                             // CmjToPlatoText is global
                             const updatedPlatoText = CmjToPlatoText(cmjMessages);
                             if (typeof updatedPlatoText !== 'string') {
@@ -297,32 +372,32 @@ document.addEventListener('DOMContentLoaded', () => {
                                 alert('Error processing the LLM response for display.');
                                 return;
                             }
-
+                            
                             localStorage.setItem('multilogue', updatedPlatoText);
-
+                            
                             // updateDisplayState
                             updateDisplayState();
                             console.log('Dialogue updated with LLM response.');
-
+                            
                         } catch (processingError) {
                             console.error('Error processing LLM response:', processingError);
                             alert('An error occurred while processing the LLM response: ' + processingError.message);
                         }
-
+                        
                     } else if (e.data.type === 'error') {
                         console.error('Main thread: Error message from worker:', e.data.error);
                         alert('Worker reported an error: ' + e.data.error);
                     }
                 };
-
-                llmWorker.onerror = function(error) {
+                
+                llmWorker.onerror = function (error) {
                     console.error('Main thread: An error occurred with the worker script:', error.message, error);
                     alert('Failed to initialize or run worker: ' + error.message);
                 };
-
+                
                 llmWorker.postMessage(userQueryParameters);
                 console.log('Main thread: Worker launched and CMJ messages sent.');
-
+                
             } catch (e) {
                 console.error('Alt+Shift: Failed to process dialogue or communicate with the worker:', e);
                 alert('Error preparing data for LLM: ' + e.message);
@@ -330,7 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     // 12. Listen for storage changes to multilogue (e.g., from extension)
-    window.addEventListener('storage', function(event) {
+    window.addEventListener('storage', function (event) {
         if (event.key === 'multilogue') {
             // console.log('Page Script: localStorage.platoText changed, calling updateDisplayState.');
             // Ensure updateDisplayState is accessible here or call the relevant parts directly
@@ -346,7 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         dialogueWrapper.style.display = 'block';
                         textarea.style.display = 'none';
                         filePickerContainer.style.display = 'none';
-                        dialogueWrapper.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                        dialogueWrapper.scrollIntoView({behavior: 'smooth', block: 'end'});
                     } catch (e) {
                         console.error("Page Script (storage listener): Error rendering Plato text to HTML:", e);
                         dialogueWrapper.innerHTML = "<p class='dialogue-error'>Error loading content.</p>";
