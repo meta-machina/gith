@@ -41,58 +41,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.warn('window.machineConfig.ghtok is not defined. GitHub API features will not be available.');
     }
     
-    // Proceed to fetch YAML only if a GitHub token was successfully obtained
-    if (githubToken) {
-        try {
-            const owner = 'thingking-machine';
-            const repo = 'thingking-machine';
-            const path = 'src/thingking_machine/machina.yaml';
-            const branch = 'main';
-            
-            // Construct the GitHub API URL for repository contents
-            const githubApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
-            
-            console.log('Attempting to fetch machine configuration via raw REST API call...');
-            
-            // Make the raw fetch request to the GitHub API
-            const response = await fetch(githubApiUrl, {
-                method: 'GET',
-                headers: {
-                    // Authenticate using the fetched Personal Access Token
-                    'Authorization': `token ${githubToken}`,
-                    // Recommended header for GitHub API v3
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            });
-            
-            if (!response.ok) {
-                // Try to get more detailed error info from the response body
-                const errorData = await response.json().catch(() => null);
-                const errorMessage = errorData?.message || `HTTP error! Status: ${response.status}`;
-                throw new Error(errorMessage);
-            }
-            
-            const data = await response.json();
-            
-            // The content from the API is Base64 encoded
-            if (!data || !data.content) {
-                throw new Error('File content (Base64) not found in GitHub API response.');
-            }
-            
-            // Decode the Base64 content to get the raw YAML string
-            const yamlText = atob(data.content);
-            
-            // Use js-yaml to parse the text
-            const fetchedConfig = jsyaml.load(yamlText);
-            
-            console.log('Machine Config loaded and updated from private GitHub YAML:', fetchedConfig);
-            
-        } catch (error) {
-            console.error('Failed to load machine configuration from GitHub API:', error);
-            alert(`Could not load the machine configuration file from GitHub. Error: ${error.message}`);
-        }
-    } else {
-        console.warn('GitHub token not available. Skipping GitHub YAML fetch.');
+    const repoOwner = "thingking-machine";
+    const repoName = "thingking_machine";
+    const filePath = "machina.yaml";
+    
+    try {
+        // Initialize Octokit with the access token
+        const octokit = new Octokit({
+            auth: githubToken,
+        });
+        
+        // Fetch the file from the private repository
+        const response = await octokit.repos.getContent({
+            owner: repoOwner,
+            repo: repoName,
+            path: filePath,
+        });
+        
+        // Decode the base64 content
+        const yamlContent = atob(response.data.content);
+        
+        // Parse YAML into a JavaScript object
+        const jsObject = jsyaml.load(yamlContent);
+        console.log("Parsed YAML as JavaScript object:", jsObject)
+    } catch (error) {
+        console.error("Error fetching or parsing YAML file:", error);
+        throw error;
     }
     
     // Check whether the page has the container.
