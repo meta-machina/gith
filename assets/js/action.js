@@ -21,20 +21,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('LLM Settings:', window.llmSettings)
     
     let githubToken = null;
-    const githubTokenPath = window.machineConfig.ghtok; // Get path from machineConfig
+    // Use 'ghtok' from your config to get the token path
+    const githubTokenPath = window.machineConfig.ghtok;
     
     if (githubTokenPath) {
         try {
             console.log(`Attempting to fetch GitHub token from: ${githubTokenPath}`);
             const tokenResponse = await fetch('https://localhost/' + githubTokenPath);
             if (!tokenResponse.ok) {
-                throw new Error(`Failed to fetch GitHub token from ${githubTokenPath}: ${tokenResponse.status} ${tokenResponse.statusText}`);
+                throw new Error(`Failed to fetch GitHub token: ${tokenResponse.status} ${tokenResponse.statusText}`);
             }
-            githubToken = (await tokenResponse.text()).trim(); // Get the token and trim whitespace
+            githubToken = (await tokenResponse.text()).trim();
             console.log('GitHub token fetched successfully.');
         } catch (error) {
             console.error('Error fetching GitHub token:', error);
-            alert(`Could not load GitHub token from ${githubTokenPath}. GitHub API features may not work. Error: ${error.message}`);
+            alert(`Could not load GitHub token from ${githubTokenPath}. GitHub API features may not work.`);
         }
     } else {
         console.warn('window.machineConfig.ghtok is not defined. GitHub API features will not be available.');
@@ -43,54 +44,55 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Proceed to fetch YAML only if a GitHub token was successfully obtained
     if (githubToken) {
         try {
-            // The Octokit library is available globally as `window.octokitRest`
-            const octokit = new octokitRest.Octokit({
-                auth: githubToken
+            const owner = 'thingking-machine';
+            const repo = 'thingking-machine';
+            const path = 'src/thingking_machine/machina.yaml';
+            const branch = 'main';
+            
+            // Construct the GitHub API URL for repository contents
+            const githubApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
+            
+            console.log('Attempting to fetch machine configuration via raw REST API call...');
+            
+            // Make the raw fetch request to the GitHub API
+            const response = await fetch(githubApiUrl, {
+                method: 'GET',
+                headers: {
+                    // Authenticate using the fetched Personal Access Token
+                    'Authorization': `token ${githubToken}`,
+                    // Recommended header for GitHub API v3
+                    'Accept': 'application/vnd.github.v3+json'
+                }
             });
             
-            const owner = 'thingking-machine'; // Your GitHub username or organization
-            const repo = 'thingking-machine'; // The name of your private repository
-            const path = 'src/thingking_machine/machina.yaml'; // The path to the YAML file within the repo
-            const branch = 'main'; // The branch where the file is located (e.g., 'main', 'master', 'dev')
+            if (!response.ok) {
+                // Try to get more detailed error info from the response body
+                const errorData = await response.json().catch(() => null);
+                const errorMessage = errorData?.message || `HTTP error! Status: ${response.status}`;
+                throw new Error(errorMessage);
+            }
             
-            console.log('Attempting to fetch machine configuration using Octokit.js...');
+            const data = await response.json();
             
-            // Use the Octokit SDK to get the repository content
-            const response = await octokit.rest.repos.getContent({
-                owner,
-                repo,
-                path,
-                ref: branch,
-            });
-            
-            // The file content from the API is in response.data.content and is Base64 encoded
-            if (!response.data || !response.data.content) {
-                throw new Error('File content not found in GitHub API response.');
+            // The content from the API is Base64 encoded
+            if (!data || !data.content) {
+                throw new Error('File content (Base64) not found in GitHub API response.');
             }
             
             // Decode the Base64 content to get the raw YAML string
-            const yamlText = atob(response.data.content);
+            const yamlText = atob(data.content);
             
-            // Use js-yaml to parse the text and store it globally
-            // Note: window.machineConfig is already initialized from head-custom.html
-            // We are now merging or overwriting properties from the YAML.
+            // Use js-yaml to parse the text
             const fetchedConfig = jsyaml.load(yamlText);
-            // A common pattern is to merge the fetched config with the existing one,
-            // allowing the YAML to override or add properties.
-            // Object.assign(window.machineInstruction, fetchedConfig);
-            console.log('Machine Config loaded and updated from private GitHub YAML via Octokit:', fetchedConfig);
+            
+            console.log('Machine Config loaded and updated from private GitHub YAML:', fetchedConfig);
             
         } catch (error) {
-            // Octokit provides detailed error messages
-            console.error('Failed to load machine configuration via Octokit:', error);
-            alert(`Could not load the machine configuration file from GitHub. Status: ${error.status || 'N/A'}. Message: ${error.message}`);
-            // Fallback: window.machineConfig is already initialized from head-custom.html,
-            // so we don't need to re-initialize it to an empty object here,
-            // but we might want to log a warning that the dynamic config failed to load.
+            console.error('Failed to load machine configuration from GitHub API:', error);
+            alert(`Could not load the machine configuration file from GitHub. Error: ${error.message}`);
         }
     } else {
         console.warn('GitHub token not available. Skipping GitHub YAML fetch.');
-        // window.machineConfig is already initialized from head-custom.html
     }
     
     // Check whether the page has the container.
