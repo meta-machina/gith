@@ -1,1 +1,1 @@
-### webmachine template for fireworks.
+### github-configured webmachine template for fireworks.
