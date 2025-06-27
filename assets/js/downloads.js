@@ -1,5 +1,3 @@
----
----
 export async function downloadLocalFile(fileName) {
   try { // --- Fetch the text file ---
     console.log(`Downloader: Fetching the ${fileName} from https://localhost/`);
